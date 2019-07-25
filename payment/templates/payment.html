@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Payment</title>
-	<!-- <script type = "text/javascript" src = "{{ url_for('static', filename = 'js/jQuery-3-4-1.min.js') }}" ></script> -->
-	<script type = "text/javascript" src = "D:\\project\\payment\\payment\\static\\js\\jQuery-3-4-1.min.js" ></script>
+	<script type = "text/javascript" src = "{{ url_for('static', filename = 'js/jQuery-3-4-1.min.js') }}" ></script>
+	<!-- <script type = "text/javascript" src = "D:\\project\\payment\\payment\\static\\js\\jQuery-3-4-1.min.js" ></script> -->
 <style>
     header>div{
         margin: 0 auto;
@@ -50,23 +50,37 @@
 
     </header>
     <div id='button'>
-        <button id="payment-alipay-pay">支付宝页面付款</button>
+        <button id="payment-alipay-page-pay">支付宝页面付款</button>
+        <button id="payment-alipay-code-pay">支付宝二维码付款</button>
     </div>
 <script>
 
     (function(window){
 
 		// 数据收集
-        $(document).on("click", "#payment-alipay-pay", function(event){
+        $(document).on("click", "#payment-alipay-page-pay", function(event){
 			var order = {};
 			$('input').each(function(index,elem){
 				order[elem.name] = elem.value;
 			});
-			$.ajax({
-				url:'http://127.0.0.1:8888/payment/alipay/alipay.trade.page.pay',
+			$.post({
+				url:'http://127.0.0.1:8888/payment/alipay/page_pay',
 				data:order,
 			}).done(function(res){
 				window.location.href=res;
+			});
+        });
+        $(document).on("click", "#payment-alipay-code-pay", function(event){
+			var order = {};
+			$('input').each(function(index,elem){
+				order[elem.name] = elem.value;
+			});
+			$.post({
+				url:'http://127.0.0.1:8888/payment/alipay/code_pay',
+				data:order,
+			}).done(function(res){
+                var img = $('<img/>').attr('src',res);
+				$('#button').append(img);
 			});
 		});
 		

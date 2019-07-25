@@ -141,8 +141,8 @@ class BaseAliPay:
         return sorted([(k, v) for k, v in data.items()])
 
     def _build_body( self, method, biz_content={},
-        return_url=None, notify_url=None, version="1.0", format_ =None, app_auth_token = None,
-        timestamp= datetime.now().strftime("%Y-%m-%d %H:%M:%S")):
+        return_url=None, notify_url=None, app_auth_token = None,
+        format_ =None, version="1.0", timestamp= None):
         data = {
             "app_id": self._appid,
             "method": method,
@@ -151,7 +151,7 @@ class BaseAliPay:
             "return_url":return_url,
             "notify_url":notify_url,
             "format":format_,
-            "timestamp":timestamp,
+            "timestamp":timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "version": "1.0",
             "app_auth_token":app_auth_token,
             "biz_content":biz_content,
@@ -164,13 +164,15 @@ class BaseAliPay:
     def _sign_data(self, data):
         '''签名,返回签名后的字符串'''
         data.pop("sign", None)
-        # 排序后的字符串
+        # 排序
         ordered_items = self._ordered_data(data)
+        #转字符串
         unsigned_string = "&".join("{}={}".format(k, v) for k, v in ordered_items)
+        #签名
         sign = self._sign(unsigned_string)
+        #转义字符
         quoted_string = "&".join("{}={}".format(k, quote_plus(v)) for k, v in ordered_items)
-
-        # 获得最终的订单信息字符串
+        #添加签名到字符串
         signed_string = quoted_string + "&sign=" + quote_plus(sign)
         return signed_string
 
@@ -198,7 +200,6 @@ class BaseAliPay:
         unsigned_items = self._ordered_data(data)
         message = "&".join(u"{}={}".format(k, v) for k, v in unsigned_items)
         return self._verify(message, signature)
-
 
     def _verify_and_return_sync_response(self, raw_string, response_type):
         """
@@ -262,36 +263,140 @@ class BaseAliPay:
             return getattr(self, key)(**kwargs)
         raise AttributeError("Unknown attribute" + api_name)
 
-    def api_alipay_trade_wap_pay(
-        self, subject, out_trade_no, total_amount,return_url=None, notify_url=None, **kwargs):
-        """手机网站支付接口"""
+    def api_alipay_trade_query(
+        self, out_trade_no=None, trade_no=None):
+        '''查询订单状态,返回支付宝返回结果字典
+            out_trade_no    商家订单号
+            trade_no        支付宝交易号
+        '''
+        """
+        response = {
+          "alipay_trade_query_response": {
+            "trade_no": "2017032121001004070200176844",
+            "code": "10000",
+            "invoice_amount": "20.00",
+            "open_id": "20880072506750308812798160715407",
+            "fund_bill_list": [
+              {
+                "amount": "20.00",
+                "fund_channel": "ALIPAYACCOUNT"
+              }
+            ],
+            "buyer_logon_id": "csq***@sandbox.com",
+            "send_pay_date": "2017-03-21 13:29:17",
+            "receipt_amount": "20.00",
+            "out_trade_no": "out_trade_no15",
+            "buyer_pay_amount": "20.00",
+            "buyer_user_id": "2088102169481075",
+            "msg": "Success",
+            "point_amount": "0.00",
+            "trade_status": "TRADE_SUCCESS",
+            "total_amount": "20.00"
+          },
+          "sign": ""
+        }
+        failed response is like this
+        {
+          "alipay_trade_query_response": {
+            "sub_code": "isv.invalid-app-id",
+            "code": "40002",
+            "sub_msg": "无效的AppID参数",
+            "msg": "Invalid Arguments"
+          }
+        }
+        """
+        assert (out_trade_no is not None) or (trade_no is not None),"Both trade_no and out_trade_no are None"
+
+        biz_content = {}
+        if out_trade_no:
+            biz_content["out_trade_no"] = out_trade_no
+        if trade_no:
+            biz_content["trade_no"] = trade_no
+        data = self._build_body("alipay.trade.query", biz_content)
+
+        url = self._gateway + "?" + self._sign_data(data)
+        raw_string = urlopen(url, timeout=15).read().decode("utf-8")
+        return self._verify_and_return_sync_response(raw_string, "alipay_trade_query_response")
+
+    def api_alipay_trade_cancel(
+        self, out_trade_no=None, trade_no=None):
+        """统一收单交易撤销接口
+           撤销订单:out_trade_no    商家订单号
+                    trade_no        支付宝交易号""" 
+        """
+        response = {
+        "alipay_trade_cancel_response": {
+            "msg": "Success",
+            "out_trade_no": "out_trade_no15",
+            "code": "10000",
+            "retry_flag": "N"
+          }
+        }
+        """
+
+        assert (out_trade_no is not None) or (trade_no is not None),"Both trade_no and out_trade_no are None"
+
+        biz_content = {}
+        if out_trade_no:
+            biz_content["out_trade_no"] = out_trade_no
+        if trade_no:
+            biz_content["trade_no"] = trade_no
+
+        data = self._build_body("alipay.trade.cancel", biz_content)
+
+        url = self._gateway + "?" + self._sign_data(data)
+        raw_string = urlopen(url, timeout=15).read().decode("utf-8")
+        return self._verify_and_return_sync_response(raw_string, "alipay_trade_cancel_response")
+
+    def api_alipay_trade_close(
+        self, out_trade_no=None, trade_no=None, operator_id=None):
+        """统一收单交易关闭接口
+        operator_id	String	可选	28	卖家端自定义的的操作员 ID	YX01
+        """
+        """
+        response = {
+            "alipay_trade_close_response": {
+                "code": "10000",
+                "msg": "Success",
+                "trade_no": "2013112111001004500000675971",
+                "out_trade_no": "YX_001"
+            }
+        }
+        """
+
+        assert (out_trade_no is not None) or (trade_no is not None),"Both trade_no and out_trade_no are None"
+
+        biz_content = {}
+        if out_trade_no:
+            biz_content["out_trade_no"] = out_trade_no
+        if trade_no:
+            biz_content["trade_no"] = trade_no
+        if operator_id:
+            biz_content["operator_id"] = operator_id
+
+        data = self._build_body("alipay.trade.close", biz_content)
+
+        url = self._gateway + "?" + self._sign_data(data)
+        raw_string = urlopen(url, timeout=15).read().decode("utf-8")
+        return self._verify_and_return_sync_response(raw_string, "alipay_trade_close_response")
+
+    def api_alipay_trade_page_pay(
+        self, subject=None, out_trade_no=None, total_amount=None,return_url=None, notify_url=None, **kwargs):
+        """统一收单下单并支付页面接口 网站页面扫码"""
         biz_content = {
             "subject": subject,
             "out_trade_no": out_trade_no,
             "total_amount": total_amount,
-            "product_code": "QUICK_WAP_PAY"
+            "product_code": "FAST_INSTANT_TRADE_PAY"
         }
         biz_content.update(kwargs)
         data = self._build_body(
-            "alipay.trade.wap.pay",
+            "alipay.trade.page.pay",
             biz_content,
             return_url=return_url,
             notify_url=notify_url
         )
-        return self._sign_data(data)
-
-    def api_alipay_trade_app_pay(
-        self, subject, out_trade_no, total_amount, notify_url=None, **kwargs):
-        """app支付接口 手机app支付"""
-        biz_content = {
-            "subject": subject,
-            "out_trade_no": out_trade_no,
-            "total_amount": total_amount,
-            "product_code": "QUICK_MSECURITY_PAY"
-        }
-        biz_content.update(kwargs)
-        data = self._build_body("alipay.trade.app.pay", biz_content, notify_url=notify_url)
-        return self._sign_data(data)
+        return self.gateway + "?" + self._sign_data(data)
 
     def api_alipay_trade_pay(
         self, out_trade_no, scene, auth_code, subject, notify_url=None, **kwargs):
@@ -367,78 +472,36 @@ class BaseAliPay:
         raw_string = urlopen(url, timeout=15).read().decode("utf-8")
         return self._verify_and_return_sync_response(raw_string, "alipay_trade_pay_response")
 
-    def api_alipay_trade_page_pay(
+    def api_alipay_trade_wap_pay(
         self, subject, out_trade_no, total_amount,return_url=None, notify_url=None, **kwargs):
-        """统一收单下单并支付页面接口 网站页面扫码"""
+        """手机网站支付接口"""
         biz_content = {
             "subject": subject,
             "out_trade_no": out_trade_no,
             "total_amount": total_amount,
-            "product_code": "FAST_INSTANT_TRADE_PAY"
+            "product_code": "QUICK_WAP_PAY"
         }
         biz_content.update(kwargs)
         data = self._build_body(
-            "alipay.trade.page.pay",
+            "alipay.trade.wap.pay",
             biz_content,
             return_url=return_url,
             notify_url=notify_url
         )
         return self._sign_data(data)
 
-    def api_alipay_trade_query(
-        self, out_trade_no=None, trade_no=None):
-        '''查询订单状态,返回支付宝返回结果字典
-            out_trade_no    商家订单号
-            trade_no        支付宝交易号
-        '''
-        """
-        response = {
-          "alipay_trade_query_response": {
-            "trade_no": "2017032121001004070200176844",
-            "code": "10000",
-            "invoice_amount": "20.00",
-            "open_id": "20880072506750308812798160715407",
-            "fund_bill_list": [
-              {
-                "amount": "20.00",
-                "fund_channel": "ALIPAYACCOUNT"
-              }
-            ],
-            "buyer_logon_id": "csq***@sandbox.com",
-            "send_pay_date": "2017-03-21 13:29:17",
-            "receipt_amount": "20.00",
-            "out_trade_no": "out_trade_no15",
-            "buyer_pay_amount": "20.00",
-            "buyer_user_id": "2088102169481075",
-            "msg": "Success",
-            "point_amount": "0.00",
-            "trade_status": "TRADE_SUCCESS",
-            "total_amount": "20.00"
-          },
-          "sign": ""
+    def api_alipay_trade_app_pay(
+        self, subject, out_trade_no, total_amount, notify_url=None, **kwargs):
+        """app支付接口 手机app支付"""
+        biz_content = {
+            "subject": subject,
+            "out_trade_no": out_trade_no,
+            "total_amount": total_amount,
+            "product_code": "QUICK_MSECURITY_PAY"
         }
-        failed response is like this
-        {
-          "alipay_trade_query_response": {
-            "sub_code": "isv.invalid-app-id",
-            "code": "40002",
-            "sub_msg": "无效的AppID参数",
-            "msg": "Invalid Arguments"
-          }
-        }
-        """
-        assert (out_trade_no is not None) or (trade_no is not None),"Both trade_no and out_trade_no are None"
-
-        biz_content = {}
-        if out_trade_no:
-            biz_content["out_trade_no"] = out_trade_no
-        if trade_no:
-            biz_content["trade_no"] = trade_no
-        data = self._build_body("alipay.trade.query", biz_content)
-
-        url = self._gateway + "?" + self._sign_data(data)
-        raw_string = urlopen(url, timeout=15).read().decode("utf-8")
-        return self._verify_and_return_sync_response(raw_string, "alipay_trade_query_response")
+        biz_content.update(kwargs)
+        data = self._build_body("alipay.trade.app.pay", biz_content, notify_url=notify_url)
+        return self._sign_data(data)
 
     def api_alipay_trade_create(
         self, subject, out_trade_no, total_amount, notify_url=None, **kwargs):
@@ -461,7 +524,7 @@ class BaseAliPay:
         return self._sign_data(data)
 
     def api_alipay_trade_precreate(
-        self, subject, out_trade_no, total_amount, **kwargs):
+        self, subject=None, out_trade_no=None, total_amount=None, **kwargs):
         """统一收单线下交易预创建
             收银员通过收银台或商户后台调用支付宝接口，生成二维码后，展示给用户，由用户扫描二维码完成订单支付
 
@@ -502,68 +565,6 @@ class BaseAliPay:
         #返回html字节串
         raw_string = urlopen(url, timeout=15).read().decode("utf-8")
         return self._verify_and_return_sync_response(raw_string, "alipay_trade_precreate_response")
-
-    def api_alipay_trade_cancel(
-        self, out_trade_no=None, trade_no=None):
-        """统一收单交易撤销接口
-           撤销订单:out_trade_no    商家订单号
-                    trade_no        支付宝交易号""" 
-        """
-        response = {
-        "alipay_trade_cancel_response": {
-            "msg": "Success",
-            "out_trade_no": "out_trade_no15",
-            "code": "10000",
-            "retry_flag": "N"
-          }
-        }
-        """
-
-        assert (out_trade_no is not None) or (trade_no is not None),"Both trade_no and out_trade_no are None"
-
-        biz_content = {}
-        if out_trade_no:
-            biz_content["out_trade_no"] = out_trade_no
-        if trade_no:
-            biz_content["trade_no"] = trade_no
-
-        data = self._build_body("alipay.trade.cancel", biz_content)
-
-        url = self._gateway + "?" + self._sign_data(data)
-        raw_string = urlopen(url, timeout=15).read().decode("utf-8")
-        return self._verify_and_return_sync_response(raw_string, "alipay_trade_cancel_response")
-
-    def api_alipay_trade_close(
-        self, out_trade_no=None, trade_no=None, operator_id=None):
-        """统一收单交易关闭接口
-        operator_id	String	可选	28	卖家端自定义的的操作员 ID	YX01
-        """
-        """
-        response = {
-            "alipay_trade_close_response": {
-                "code": "10000",
-                "msg": "Success",
-                "trade_no": "2013112111001004500000675971",
-                "out_trade_no": "YX_001"
-            }
-        }
-        """
-
-        assert (out_trade_no is not None) or (trade_no is not None),"Both trade_no and out_trade_no are None"
-
-        biz_content = {}
-        if out_trade_no:
-            biz_content["out_trade_no"] = out_trade_no
-        if trade_no:
-            biz_content["trade_no"] = trade_no
-        if operator_id:
-            biz_content["operator_id"] = operator_id
-
-        data = self._build_body("alipay.trade.close", biz_content)
-
-        url = self._gateway + "?" + self._sign_data(data)
-        raw_string = urlopen(url, timeout=15).read().decode("utf-8")
-        return self._verify_and_return_sync_response(raw_string, "alipay_trade_close_response")
 
     def api_alipay_trade_refund(
         self, refund_amount, out_trade_no=None, trade_no=None, **kwargs):
