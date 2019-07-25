@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Payment</title>
+	<!-- <script type = "text/javascript" src = "{{ url_for('static', filename = 'js/jQuery-3-4-1.min.js') }}" ></script> -->
+	<script type = "text/javascript" src = "D:\\project\\payment\\payment\\static\\js\\jQuery-3-4-1.min.js" ></script>
+<style>
+    header>div{
+        margin: 0 auto;
+        margin-top:30px;
+        width: 100%;
+        text-align: center;
+    }
+    header>div>input{
+        width: 50%;
+        height: 32px;
+		margin-top: 10px;
+        font-size: 1.4em;
+        padding: 5px 10px;
+		border-radius: 5px;
+    }
+    #button{
+		padding: 2em 0px;
+        margin: 0 auto;
+        margin-top: 30px;
+        background-color: bisque;
+        text-align: center;
+    }
+    #button button{
+		font-size: 1.4em;
+        height: 45px;
+        border-radius: 5px;
+        background-color: aquamarine;
+    }
+    #button button:hover{
+        background-color: rgb(10, 110, 77);
+    }
+</style>
+</head>
+<body>
+    <header>
+        <div>
+            <input type="text" name="subject" placeholder="订单标题"/>
+            <input type="number" name="total_amount" placeholder="价格"/>
+            <input type="number" name="auth_code" placeholder="用户支付码"/>
+        </div>
+
+    </header>
+    <div id='button'>
+        <button id="payment-alipay-pay">支付宝页面付款</button>
+    </div>
+<script>
+
+    (function(window){
+
+		// 数据收集
+        $(document).on("click", "#payment-alipay-pay", function(event){
+			var order = {};
+			$('input').each(function(index,elem){
+				order[elem.name] = elem.value;
+			});
+			$.ajax({
+				url:'http://127.0.0.1:8888/payment/alipay/alipay.trade.page.pay',
+				data:order,
+			}).done(function(res){
+				window.location.href=res;
+			});
+		});
+		
+		// 扫描锁定
+		var keycode = "";
+		var curTime = null;
+		var lastTime = null;
+        $(document).on('keydown',function (event) {
+			var key = event.which;
+			if (key == 13 && keycode !=""){
+				// String($("*:focus").val()).replace(keycode,null);
+				focus = $("input:focus")[0];
+				if(focus){focus.value=focus.value.replace(keycode,'');}
+				$("input[name='auth_code']").val(keycode);
+				keycode = "";
+				curTime = null;
+			}else{
+				curTime = new Date().getTime();
+				if(keycode==""){
+					keycode = String.fromCharCode(key);
+				}else if(curTime-lastTime<30){
+					keycode += String.fromCharCode(key);
+				}else{
+					keycode = "";
+					curTime = null;
+				}
+				lastTime = curTime;
+			}
+        });
+
+    })(this);
+</script>
+</body>
+</html>

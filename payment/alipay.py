@@ -10,7 +10,7 @@ Alipy 支付API   蚂蚁金服开放平台开发文档地址 https://docs.open.a
 @Programming Language : Python3
 
 修改自 python-alipay-sdk包
-Cryptodome依赖包使用 pip3 install pycrytodomex下载
+Cryptodome依赖包使用 pip3 install pycryptodomex下载
 
 应用ip、应用公私匙、支付宝公匙请到蚂蚁金服开放平台获取
 """
@@ -143,21 +143,6 @@ class BaseAliPay:
     def _build_body( self, method, biz_content={},
         return_url=None, notify_url=None, version="1.0", format_ =None, app_auth_token = None,
         timestamp= datetime.now().strftime("%Y-%m-%d %H:%M:%S")):
-        """
-        公共参数
-        app_id	        String	是	        32	    支付宝分配给开发者的应用ID	    2014072300007148
-        method	        String	是	        128	    接口名称	                   alipay.trade.page.pay
-        charset	        String	是	        10	    请求使用的编码格式，如utf-8,gbk,gb2312等	utf-8
-        sign_type	    String	是	        10	    商户生成签名字符串所使用的签名算法类型，目前支持RSA2和RSA，推荐使用RSA2	RSA2
-        sign	        String	是	        344	    商户请求参数的签名串，详见签名	            详见示例
-        timestamp	    String	是	        19	    发送请求的时间，格式"yyyy-MM-dd HH:mm:ss"	2014-07-24 03:07:50
-        version	        String	是	        3	    调用的接口版本，固定为：1.0	1.0
-        format	        String	否	        40	    仅支持JSON	JSON
-        return_url	    String	否	        256	    HTTP/HTTPS开头字符串	        https://m.alipay.com/Gk8NF23
-        notify_url	    String	否	        256	    支付宝服务器主动通知商户服务器里指定的页面http/https路径。	http://api.test.alipay.net/atinterface/receive_notify.htm
-        app_auth_token  String	否	        40	    详见应用授权概述	
-        biz_content
-        """
         data = {
             "app_id": self._appid,
             "method": method,
@@ -850,44 +835,3 @@ class AliPayException(Exception):
 class AliPayValidationError(Exception):
     '''验证错误'''
     pass
-
-
-
-# 公共参数	            类型	是否必填	最大长度	    描述	                    示例值
-# app_id	        String	是	        32	    支付宝分配给开发者的应用ID	    2014072300007148
-# method	        String	是	        128	    接口名称	                   alipay.trade.page.pay
-# format	        String	否	        40	    仅支持JSON	JSON
-# return_url	    String	否	        256	    HTTP/HTTPS开头字符串	        https://m.alipay.com/Gk8NF23
-# charset	        String	是	        10	    请求使用的编码格式，如utf-8,gbk,gb2312等	utf-8
-# sign_type	        String	是	        10	    商户生成签名字符串所使用的签名算法类型，目前支持RSA2和RSA，推荐使用RSA2	RSA2
-# sign	            String	是	        344	    商户请求参数的签名串，详见签名	            详见示例
-# timestamp	        String	是	        19	    发送请求的时间，格式"yyyy-MM-dd HH:mm:ss"	2014-07-24 03:07:50
-# version	        String	是	        3	    调用的接口版本，固定为：1.0	1.0
-# notify_url	    String	否	        256	    支付宝服务器主动通知商户服务器里指定的页面http/https路径。	http://api.test.alipay.net/atinterface/receive_notify.htm
-# app_auth_token    String	否	        40	    详见应用授权概述	
-# biz_content	    String	是		    请求参数的集合，最大长度不限，除公共参数外所有请求参数都必须放在这个参数中传递，具体参照各产品快速接入文档
-
-
-# 同步返回处理（return_url）：是一种可视化的返回，ie页面跳转通知，只要支付成功，支付宝通过get方式跳转到这个地址，并且带有参数给这个页面。
-# 客户获取信息受到买家操作的影响。如果买家支付完成后客户服务器响应比较慢，买家在显示支付宝提示的“即时到账支付成功“时关闭页面
-# ，那么客户网站是获取不到信息，我们这边称为” 掉单“。而且这个返回处理是一次性调取，即支付成功后才调取同步返回处理。
-
-# 异步返回处理（notify_url）：它的数据交互是通过服务器间进行数据交互,必须将其放置在服务器上(公网)测试，服务器post消息到异步返回处理页面，
-# 需要客户技术在异步返回处理页面处理相关的数据处理，然后每一步操作都要返回给支付宝success（不能包含其他的HTML脚本语言，不可以做页面跳转。）
-# 这个返回处理如果集成OK，那么基本不会出现掉单，因为支付宝会在24小时之内分6~10次将订单信息返回个给客户网站，直到支付宝捕获success。
-
-# 公共响应参数
-# 参数	    类型	是否必填	最大长度	    描述	    示例值
-# code	    String	是	        -	    网关返回码,详见文档	40004
-# msg	    String	是	        -	    网关返回码描述,详见文档	Business Failed
-# sub_code	String	否	        -	    业务返回码，参见具体的API接口文档	ACQ.TRADE_HAS_SUCCESS
-# sub_msg	String	否	        -	    业务返回码描述，参见具体的API接口文档	交易已被支付
-# sign	    String	是	        -	    签名,详见文档
-
-# 响应参数
-# 参数	        类型	    是否必填	最大长度	描述	示例值
-# trade_no	    String	    必填	    64	    支付宝交易号	2013112011001004330000121536
-# out_trade_no	String	    必填	    64	    商户订单号	6823789339978248
-# seller_id	    String	    必填	    16	    收款支付宝账号对应的支付宝唯一用户号。 以2088开头的纯16位数字	2088111111116894
-# total_amount	Price	    必填	    11	    交易金额	128.00
-# merchant_order_no	String	必填	    32	    商户原始订单号，最大长度限制32位	20161008001

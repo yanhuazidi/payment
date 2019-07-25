@@ -1,5 +1,5 @@
 
-from alipay import AliPay
+from .alipay import AliPay
 import time,qrcode
  
  
