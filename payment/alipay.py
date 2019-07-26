@@ -196,8 +196,9 @@ class BaseAliPay:
             sign_type = data.pop("sign_type")
             if sign_type != self._sign_type:
                 raise AliPayException(None, "未知的sign_type: {}".format(sign_type))
-        # 排序后的字符串
+        # 排序后
         unsigned_items = self._ordered_data(data)
+        #转字符串
         message = "&".join(u"{}={}".format(k, v) for k, v in unsigned_items)
         return self._verify(message, signature)
 
@@ -399,7 +400,7 @@ class BaseAliPay:
         return self.gateway + "?" + self._sign_data(data)
 
     def api_alipay_trade_pay(
-        self, out_trade_no, scene, auth_code, subject, notify_url=None, **kwargs):
+        self, out_trade_no=None, scene=None, auth_code=None, subject=None, notify_url=None, **kwargs):
         """统一收单交易支付接口, 付款码支付
         out_trade_no	String	    必选	64	商户订单号
         scene	        String	    必选	32	支付场景 

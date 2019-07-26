@@ -10,10 +10,9 @@ from .alipay_fun import init_alipay
 payment_app = Flask('payment')
 
 
-out_trade_no = 11111111111
 @payment_app.route('/')
 def index():
-    return render_template('payment.html')
+    return render_template('payment.html',out_trade_no=int(time.time()))
 
 def alipay_cancel_order(out_trade_no:int, cancel_time=None):
     result = init_alipay().api_alipay_trade_cancel(out_trade_no=out_trade_no)
@@ -32,53 +31,86 @@ def alipay_cancel_order(out_trade_no:int, cancel_time=None):
         print('请求失败：',resp_state)
         return
 
-def alipay_query_order(out_trade_no:int, cancel_time:int and 'secs'):
+
+@payment_app.route('/alipay/refund')
+def alipay_order_refund():
     '''
+    退款
     :param out_trade_no: 商户订单号
     :return: None
     '''
-    _time = 0
-    for i in range(10):
-        time.sleep(5)
- 
-        result = init_alipay().api_alipay_trade_query(out_trade_no=out_trade_no)
-        if result.get("trade_status", "") == "TRADE_SUCCESS":
-            print('订单已支付!')
-            print('订单查询返回值：',result)
-            break
- 
-        _time += 5
-        if _time >= cancel_time:
-            alipay_cancel_order(out_trade_no,cancel_time)
-            return
+    order = dict(request.args)
+    result = init_alipay().api_alipay_trade_query(out_trade_no=order['out_trade_no'])
+    if result.get("trade_status", "") == "TRADE_SUCCESS":
+        result = init_alipay().api_alipay_trade_refund(refund_amount=order['total_amount'],out_trade_no=order['out_trade_no'])
+        print(result)
 
+        return json.dumps({'code':1,'msg':f"成功退款 {result.get('refund_fee')} 元"})
+    else:
+        return json.dumps({'code':0,'msg':result.get('sub_msg')})
+            
+
+@payment_app.route('/alipay/page_pay/return')
+def allipay_page_pay_return():
+    '''页面支付同步返回'''
+    order = dict(request.args)
+    sign = order.pop('sign')
+    if init_alipay().verify(order,sign):
+        return render_template('order_info.html',order=order)
+    else:
+        return render_template('order_info.html',msg='验证不通过')
+    
+
+@payment_app.route('/notify')
+def allipay_notify_return():
+    '''异步通知接收'''
+    order = dict(request.args)
+    sign = order.pop('sign')
+    if init_alipay().verify(order,sign):
+        print(order)
+    else:
+        print('验证不通过')
 
 @payment_app.route('/alipay/<method>',methods=['POST'])
 def alipay_request(method):
-    order = dict(request.form)
-    order['out_trade_no']=out_trade_no
+    '''支付请求'''
     alipay_obj = init_alipay()
+    order = dict(request.form)
+
+    result = alipay_obj.api_alipay_trade_query(out_trade_no=order['out_trade_no'])
+    if result.get("trade_status", "") == "TRADE_SUCCESS":
+        return json.dumps({'code':0,'msg':'已支付'})
+
     if method == 'page_pay':
         res = alipay_obj.api_alipay_trade_page_pay(
-            return_url="http://127.0.0.1:8888/payment/",
-            notify_url="http://127.0.0.1:8888/payment/",
+            return_url="http://127.0.0.1:8888/payment/alipay/page_pay/return",
+            notify_url="http://127.0.0.1:8888/payment/notify",
             **order
         )
-        return res
+        return json.dumps({'code':1,'msg':res})
+
     elif method == 'code_pay':
-        code_url = alipay_obj.api_alipay_trade_page_pay(
-            return_url="http://127.0.0.1:8888/payment/",
-            notify_url="http://127.0.0.1:8888/payment/",
+        result = alipay_obj.api_alipay_trade_precreate(
+            notify_url="http://127.0.0.1:8888/payment/notify",
             **order
         )
-        qr = qrcode.QRCode(version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=10,border=1)
-        qr.add_data(code_url)  # 二维码所含信息
-        img = qr.make_image()  # 生成二维码图片
-        # img.save(r'qr_test_ali.png')
-        return img
-    
+        return json.dumps({'code':1,'msg':result.get('qr_code')})
+
+    elif method == 'barcode_pay':
+        order['scene'] = 'bar_code'
+        result = alipay_obj.api_alipay_trade_pay(
+            notify_url="http://127.0.0.1:8888/payment/notify",
+            **order
+        )
+        if result.get('code')=='10000':
+            return json.dumps({'code':1,'msg':'支付成功'})
+        elif result.get('code')=='10003':
+            return json.dumps({'code':0,'msg':'order success pay inprocess'})
+        else:
+            return json.dumps({'code':0,'msg':result.get('sub_msg')})
+
+
+
 
 
 

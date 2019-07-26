@@ -6,7 +6,9 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Payment</title>
 	<script type = "text/javascript" src = "{{ url_for('static', filename = 'js/jQuery-3-4-1.min.js') }}" ></script>
-	<!-- <script type = "text/javascript" src = "D:\\project\\payment\\payment\\static\\js\\jQuery-3-4-1.min.js" ></script> -->
+	<script type = "text/javascript" src = "{{ url_for('static', filename = 'js/qrcode.min.js') }}" ></script>
+	<!-- <script type = "text/javascript" src = "D:\\project\\payment\\payment\\static\\js\\jQuery-3-4-1.min.js" ></script>
+	<script type = "text/javascript" src = "D:\\project\\payment\\payment\\static\\js\\qrcode.min.js" ></script> -->
 <style>
     header>div{
         margin: 0 auto;
@@ -22,43 +24,125 @@
         padding: 5px 10px;
 		border-radius: 5px;
     }
-    #button{
+    .button{
 		padding: 2em 0px;
         margin: 0 auto;
         margin-top: 30px;
         background-color: bisque;
         text-align: center;
     }
-    #button button{
+    .button button{
 		font-size: 1.4em;
         height: 45px;
         border-radius: 5px;
         background-color: aquamarine;
     }
-    #button button:hover{
+    .button button:hover{
         background-color: rgb(10, 110, 77);
     }
+	.hide{
+		display: none;
+	}
+	.popup{
+		position: absolute;
+		top: 0;
+		right: 0;
+		left: 0;
+		bottom: 0;
+		height: 100%;
+		width: 100%;
+		background-color:#000000b3;
+		z-index: 1000;
+	}
+	.popup-code>div{
+		position: relative;
+		z-index: 2000;
+		width: 400px;
+		height: 400px;
+    	margin: 100px auto;
+	}
+	.popup-code>div img{
+		margin: 5px auto;
+	}
+	.popup-msg>div{
+		position: relative;
+		z-index: 2000;
+    	margin: 100px auto;
+		text-align: center;
+		background-color: aliceblue;
+	}
+	.popup-msg>div h1{
+		border: 2px solid rgb(26, 24, 24);
+		padding: 20px;
+	}
+
+
 </style>
 </head>
 <body>
     <header>
         <div>
-            <input type="text" name="subject" placeholder="订单标题"/>
-            <input type="number" name="total_amount" placeholder="价格"/>
-            <input type="number" name="auth_code" placeholder="用户支付码"/>
+			<input type="text" name="out_trade_no" placeholder="订单号" value="{{ out_trade_no }}" disabled/>
+            <input type="text" name="subject" placeholder="订单标题" required/>
+            <input type="number" name="total_amount" placeholder="价格" required/>
         </div>
 
     </header>
-    <div id='button'>
+    <div class='button'>
         <button id="payment-alipay-page-pay">支付宝页面付款</button>
-        <button id="payment-alipay-code-pay">支付宝二维码付款</button>
-    </div>
+		<button id="payment-alipay-code-pay">支付宝二维码付款</button>
+		<button id="payment-alipay-barcode-pay">支付宝扫码枪付款</button>
+	</div>
+	<div class='button'>
+			<button id="payment-alipay-return">支付宝退款</button>
+		</div>
+	<div class="popup-box">
+		<div class="popup popup-code hide">
+			<div>	
+				<div id="qrcode"></div>
+			</div>
+		</div>
+		<div class="popup popup-msg hide">
+			<div>	
+				<h1></h1>
+			</div>
+		</div>
+	</div>
 <script>
 
     (function(window){
-
 		// 数据收集
-        $(document).on("click", "#payment-alipay-page-pay", function(event){
+
+		function msg(msg){
+			$('.popup-msg').removeClass('hide').find('h1').text(msg);
+			
+		}
+		
+		$("#payment-alipay-return").on("click", function(event){
+			$('body').css('background-color','#000');
+			var order = {};
+			$('input').each(function(index,elem){
+				order[elem.name] = elem.value;
+			});
+			$.get({
+				url:'http://127.0.0.1:8888/payment/alipay/refund',
+				data:order,
+				dataType:'json',
+			}).done(function(res){
+				if(res.code==1){
+					msg(res.msg);
+				}else{
+					msg(res.msg);
+				}
+				setTimeout(function(){
+						$('.popup-msg').addClass('hide');
+						$('body').css('background-color','#fff');
+					},3000);
+			});
+        });
+
+		//页面跳转支付
+        $("#payment-alipay-page-pay").on("click", function(event){
 			var order = {};
 			$('input').each(function(index,elem){
 				order[elem.name] = elem.value;
@@ -66,11 +150,18 @@
 			$.post({
 				url:'http://127.0.0.1:8888/payment/alipay/page_pay',
 				data:order,
+				dataType:'json',
 			}).done(function(res){
-				window.location.href=res;
+				if(res.code==1){
+					window.location.href=res.msg;
+				}else{
+					msg(res.msg);
+				}
 			});
         });
-        $(document).on("click", "#payment-alipay-code-pay", function(event){
+
+		//二维码付款
+        $("#payment-alipay-code-pay").on("click",function(event){
 			var order = {};
 			$('input').each(function(index,elem){
 				order[elem.name] = elem.value;
@@ -78,23 +169,59 @@
 			$.post({
 				url:'http://127.0.0.1:8888/payment/alipay/code_pay',
 				data:order,
+				dataType:'json',
 			}).done(function(res){
-                var img = $('<img/>').attr('src',res);
-				$('#button').append(img);
+				if(res.code==1){
+					var qrcode = new QRCode(document.getElementById("qrcode"), {
+						text: res.msg,
+						width: 350,
+						height: 350,
+						colorDark : "#000000",
+						colorLight : "#ffffff",
+						correctLevel : QRCode.CorrectLevel.H
+					});
+					$('.popup-code').removeClass('hide');
+				}else{
+					msg(res.msg);
+				}
 			});
 		});
-		
+
+		$( "#payment-alipay-barcode-pay").on("click", function(event){
+			$('body').css('background-color','#000');
+        });
+
+
 		// 扫描锁定
 		var keycode = "";
 		var curTime = null;
 		var lastTime = null;
         $(document).on('keydown',function (event) {
 			var key = event.which;
-			if (key == 13 && keycode !=""){
-				// String($("*:focus").val()).replace(keycode,null);
+			if (key == 13 && keycode.length>5){
 				focus = $("input:focus")[0];
 				if(focus){focus.value=focus.value.replace(keycode,'');}
-				$("input[name='auth_code']").val(keycode);
+				var order = {};
+				$('input').each(function(index,elem){
+					order[elem.name] = elem.value;
+				});
+				order['auth_code'] = keycode;
+				msg('订单支付中...');
+				$.post({
+					url:'http://127.0.0.1:8888/payment/alipay/barcode_pay',
+					data:order,
+					dataType:'json',
+				}).done(function(res){
+					if(res.code==1){
+						msg(res.msg);
+					}else{
+						msg(res.msg);
+					}
+					setTimeout(function(){
+						$('.popup-msg').addClass('hide');
+						$('body').css('background-color','#fff');
+					},2000);
+				});
 				keycode = "";
 				curTime = null;
 			}else{
@@ -110,7 +237,6 @@
 				lastTime = curTime;
 			}
         });
-
     })(this);
 </script>
 </body>
